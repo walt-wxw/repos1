@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd">
+
+    <context:component-scan base-package="cn.itcast"></context:component-scan>
+
+    <!--dbutils-->
+    <bean id="query" class="org.apache.commons.dbutils.QueryRunner" scope="prototype">
+        <constructor-arg name="ds" ref="c3p0"/>
+    </bean>
+    <!--jdbcTemplate-->
+    <bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+        <constructor-arg name="dataSource" ref="druid"/>
+    </bean>
+
+    <!--c3p0连接池技术-->
+    <bean id="c3p0" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <property name="driverClass" value="com.mysql.jdbc.Driver"></property>
+        <property name="jdbcUrl" value="jdbc:mysql://localhost:3306/mybatis01"></property>
+        <property name="user" value="root"></property>
+        <property name="password" value="root"></property>
+    </bean>
+
+    <!--阿里巴巴druid连接池技术-->
+    <bean id="druid" class="com.alibaba.druid.pool.DruidDataSource">
+        <!--driverClassName可以不用配置-->
+        <property name="driverClassName" value="com.mysql.jdbc.Driver"></property>
+        <property name="url" value="jdbc:mysql://localhost:3306/mybatis01"></property>
+        <property name="username" value="root"></property>
+        <property name="password" value="root"></property>
+    </bean>
+
+    <!-- 获取连接对象 -->
+    <bean id="getConnection" factory-bean="c3p0" factory-method="getConnection">
+        <property name="autoCommit" value="false"/>
+    </bean>
+
+
+    <!--可以用xml实现功能-->
+    <!--创建BookDao类的对象-->
+    <bean id="bookDaoImpl1" class="cn.itcast.dao.impl.BookDaoImpl">
+        <!--set注入jdbcTemplate的属性值-->
+        <!--<property name="jdbcTemplate" ref="jdbcTemplate"/>-->
+        <property name="runner" ref="query"/>
+        <property name="connection" ref="getConnection"/>
+    </bean>
+    <!--创建BookServiceTmpl类的对象-->
+    <bean name="bookServiceImpl1" class="cn.itcast.service.impl.BookServiceImpl">
+        <!--set注入bookDao的属性值-->
+        <property name="bookDao" ref="bookDaoImpl1"/>
+    </bean>
+
+
+    <aop:config>
+        <aop:aspect id="advice" ref="configProxy">
+<!--
+            <aop:before method="before" pointcut="execution(void cn.itcast.service.impl.BookServiceImpl.trans())"/>
+            <aop:after method="after" pointcut="execution(void cn.itcast.service.impl.BookServiceImpl.trans())"/>
+            <aop:after-throwing method="thowing" pointcut="execution(void cn.itcast.service.impl.BookServiceImpl.trans())"/>
+            <aop:after-returning method="end" pointcut="execution(void cn.itcast.service.impl.BookServiceImpl.trans())"/>
+-->
+
+            <aop:around method="get" pointcut="execution(* *..BookServiceImpl.*(..))"/>
+        </aop:aspect>
+    </aop:config>
+
+
+    <!--<aop:aspectj-autoproxy proxy-target-class="true"></aop:aspectj-autoproxy>-->
+  <!--
+    1.定义事务管理器
+    2.申明事务的规则
+    3.申明事务的作用层面
+    -->
+    <!--1.定义事务管理器-->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="c3p0"></property>
+    </bean>
+
+    <!--2.申明事务的规则-->
+    <tx:advice id="interceptor" transaction-manager="transactionManager">
+        <tx:attributes>
+            <tx:method name="find*" propagation="NOT_SUPPORTED" read-only="true"/>
+            <tx:method name="*" propagation="REQUIRED"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <!--3.申明事务的作用层面-->
+    <aop:config>
+        <aop:advisor advice-ref="interceptor" pointcut="execution(* cn.itcast.service.impl.*.*(..))"></aop:advisor>
+    </aop:config>
+</beans>
